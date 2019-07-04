@@ -55,5 +55,5 @@ def generate_adversarial_perturbation(x, loss):
 def adversarial_loss(x, y, loss, forward, is_training=True, name="at_loss"):
     r_adv = generate_adversarial_perturbation(x, loss)
     logit = forward(x + r_adv, is_training=is_training, update_batch_stats=False)
-    loss = L.ce_loss(logit, y)
+    loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logit, labels=y))
     return loss
