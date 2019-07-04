@@ -6,6 +6,8 @@ import numpy as np
 
 import src.cnn_model as cnn
 import src.utils as utils
+import src.vat.vat as vat
+from src.losses.face_losses import arcface_loss
 
 # MNIST dataset parameters.
 num_classes = 10 # total classes (0-9 digits).
@@ -40,13 +42,29 @@ optimizer = tf.optimizers.Adam(learning_rate)
 
 
 # Optimization process.
-def run_optimization(x, y):
+def run_optimization(x, y, loss_type='cat', use_vat=False):
     # Wrap computation inside a GradientTape for automatic differentiation.
     with tf.GradientTape() as g:
+
         # Forward pass.
-        pred = conv_net(x, is_training=True)
-        # Compute loss.
-        loss = utils.cross_entropy_loss(pred, y)
+        embed, pred = conv_net(x, is_training=True)
+
+        # Compute inference loss.
+        if loss_type == 'arcface':
+
+            w_init_method = tf.contrib.layers.xavier_initializer(uniform=False)
+            arcface_logit = arcface_loss(embedding=embed, labels=y, w_init=w_init_method, out_num=num_classes)
+            inference_loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits=arcface_logit,
+                                                                                           labels=y))
+        else:
+            inference_loss = utils.cross_entropy_loss(pred, y)
+
+        loss = inference_loss
+
+        if use_vat:
+            l_logit = conv_net(x, is_training=True)
+            vat_loss = vat.virtual_adversarial_loss(x, l_logit, is_training=True)
+            loss += vat_loss
 
     # Variables to update, i.e. trainable variables.
     trainable_variables = conv_net.trainable_variables
@@ -64,7 +82,7 @@ for step, (batch_x, batch_y) in enumerate(train_data.take(training_steps), 1):
     run_optimization(batch_x, batch_y)
 
     if step % display_step == 0:
-        pred = conv_net(batch_x)
+        _, pred = conv_net(batch_x)
         loss = utils.cross_entropy_loss(pred, batch_y)
         acc = utils.accuracy(pred, batch_y)
         print("step: %i, loss: %f, accuracy: %f" % (step, loss, acc))
