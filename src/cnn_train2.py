@@ -4,10 +4,8 @@ import tensorflow as tf
 from tensorflow.keras.datasets import mnist
 import numpy as np
 
-import src.cnn_model as cnn
+import src.cnn_model2 as cnn
 import src.utils as utils
-import src.vat.vat as vat
-from src.losses.face_losses2 import arcface_loss, focal_loss_with_softmax
 
 # MNIST dataset parameters.
 num_classes = 10 # total classes (0-9 digits).
@@ -37,32 +35,34 @@ train_data = train_data.repeat().shuffle(5000).batch(batch_size).prefetch(1)
 # Build neural network model.
 conv_net = cnn.ConvNet(num_classes)
 
+# Cross-Entropy Loss.
+# Note that this will apply 'softmax' to the logits.
+def cross_entropy_loss(x, y):
+    # Convert labels to int 64 for tf cross-entropy function.
+    y = tf.cast(y, tf.int64)
+    # Apply softmax to logits and compute cross-entropy.
+    loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y, logits=x)
+    # Average loss across the batch.
+    return tf.reduce_mean(loss)
+
+# Accuracy metric.
+def accuracy(y_pred, y_true):
+    # Predicted class is the index of highest score in prediction vector (i.e. argmax).
+    correct_prediction = tf.equal(tf.argmax(y_pred, 1), tf.cast(y_true, tf.int64))
+    return tf.reduce_mean(tf.cast(correct_prediction, tf.float32), axis=-1)
+
 # Stochastic gradient descent optimizer.
 optimizer = tf.optimizers.Adam(learning_rate)
 
 
 # Optimization process.
-def run_optimization(x, y, loss_type='cat', use_vat=False):
+def run_optimization(x, y):
     # Wrap computation inside a GradientTape for automatic differentiation.
     with tf.GradientTape() as g:
-
         # Forward pass.
-        embed, pred = conv_net(x, is_training=True)
-
-        # Compute inference loss.
-        if loss_type == 'arcface':
-            w_init_method = tf.initializers.GlorotNormal()
-            arcface_logit = arcface_loss(embedding=embed, labels=y, w_init=w_init_method, out_num=num_classes)
-            inference_loss = tf.reduce_mean(focal_loss_with_softmax(logits=arcface_logit, labels=y))
-        else:
-            inference_loss = utils.cross_entropy_loss(pred, y)
-
-        loss = inference_loss
-
-        if use_vat:
-            l_logit = conv_net(x, is_training=True)
-            vat_loss = vat.virtual_adversarial_loss(x, l_logit, conv_net, is_training=True)
-            loss += vat_loss
+        pred = conv_net(x, is_training=True)
+        # Compute loss.
+        loss = cross_entropy_loss(pred, y)
 
     # Variables to update, i.e. trainable variables.
     trainable_variables = conv_net.trainable_variables
@@ -77,11 +77,10 @@ def run_optimization(x, y, loss_type='cat', use_vat=False):
 # Run training for the given number of steps.
 for step, (batch_x, batch_y) in enumerate(train_data.take(training_steps), 1):
     # Run the optimization to update W and b values.
-    #run_optimization(batch_x, batch_y, loss_type='arcface', use_vat=True)
-    run_optimization(batch_x, batch_y, use_vat=True)
+    run_optimization(batch_x, batch_y)
 
     if step % display_step == 0:
-        embed, pred = conv_net(batch_x)
-        loss = utils.cross_entropy_loss(pred, batch_y)
-        acc = utils.accuracy(pred, batch_y)
+        pred = conv_net(batch_x)
+        loss = cross_entropy_loss(pred, batch_y)
+        acc = accuracy(pred, batch_y)
         print("step: %i, loss: %f, accuracy: %f" % (step, loss, acc))
