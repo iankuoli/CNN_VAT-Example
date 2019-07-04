@@ -7,7 +7,7 @@ import numpy as np
 import src.cnn_model as cnn
 import src.utils as utils
 import src.vat.vat as vat
-from src.losses.face_losses import arcface_loss
+from src.losses.face_losses import arcface_loss, focal_loss_with_softmax
 
 # MNIST dataset parameters.
 num_classes = 10 # total classes (0-9 digits).
@@ -54,8 +54,7 @@ def run_optimization(x, y, loss_type='cat', use_vat=False):
 
             w_init_method = tf.contrib.layers.xavier_initializer(uniform=False)
             arcface_logit = arcface_loss(embedding=embed, labels=y, w_init=w_init_method, out_num=num_classes)
-            inference_loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits=arcface_logit,
-                                                                                           labels=y))
+            inference_loss = tf.reduce_mean(focal_loss_with_softmax(logits=arcface_logit, labels=y))
         else:
             inference_loss = utils.cross_entropy_loss(pred, y)
 

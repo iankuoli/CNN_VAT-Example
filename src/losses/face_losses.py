@@ -126,3 +126,18 @@ def combine_loss_val(embedding, labels, out_num, margin_a, margin_m, margin_b, s
     predict_cls_s = tf.argmax(zy, 1)
     accuracy_s = tf.reduce_mean(tf.cast(tf.equal(tf.cast(predict_cls_s, tf.int64), tf.cast(labels, tf.int64)), 'float'))
     return zy, loss, accuracy, accuracy_s, predict_cls_s
+
+
+def focal_loss_with_softmax(labels, logits, gamma=2):
+    """
+    labels: shape([batch_size], type = int32)
+    logits: shape([batch_size,num_classes], type = float32)
+    gamma: hyperparameter
+    return L: mean loss
+    """
+    y_pred = tf.nn.softmax(logits, dim=-1)
+    labels = tf.one_hot(labels, depth=y_pred.shape[1])
+    loss = -labels * ((1 - y_pred) ** gamma) * tf.log(y_pred)
+    loss = tf.reduce_sum(loss, axis=1)
+    loss = tf.reduce_mean(loss)
+    return loss
