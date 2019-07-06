@@ -6,7 +6,7 @@ from tensorflow.keras import Model, layers
 class ConvNet(Model):
 
     # Set layers.
-    def __init__(self, num_classes):
+    def __init__(self, num_classes, s=64):
         super(ConvNet, self).__init__()
 
         # Convolution Layer with 32 filters and a kernel size of 5.
@@ -28,9 +28,14 @@ class ConvNet(Model):
         self.dropout1 = layers.Dropout(rate=0.5)
 
         # Fully connected layer.
-        self.fc2 = layers.Dense(64)
+        self.fc2 = layers.Dense(32)
         # Apply Dropout (if is_training is False, dropout is not applied).
         self.dropout2 = layers.Dropout(rate=0.5)
+
+        self.cos_weight = tf.nn.l2_normalize(tf.Variable(tf.initializers.GlorotNormal()(shape=(32, num_classes)),
+                                                         name='embedding_weights', dtype=tf.float32),
+                                             axis=0)
+        self.cos_scale = s
 
         # Output layer, class prediction.
         self.out = layers.Dense(num_classes)
@@ -48,7 +53,11 @@ class ConvNet(Model):
         x = self.dropout1(x, training=is_training)
         x = self.fc2(x)
         embed = self.dropout2(x, training=is_training)
-        prediction = self.out(embed)
+
+        embed_unit = tf.nn.l2_normalize(embed, axis=1)
+        cos_t = tf.matmul(embed_unit, self.cos_weight, name='cos_t')
+
+        prediction = self.out(cos_t * self.cos_scale)
 
         if not is_training:
             # tf cross entropy expect logits without softmax, so only

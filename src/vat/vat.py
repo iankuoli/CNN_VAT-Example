@@ -1,5 +1,6 @@
 import tensorflow as tf
 
+
 # The norm length for (virtual) adversarial training
 epsilon = 8.
 
@@ -18,33 +19,20 @@ def kl_divergence_with_logit(q_logit, p_logit):
 
 
 def get_normalized_vector(d):
-    # Tensorflow v1
-    # d /= (1e-12 + tf.reduce_max(tf.abs(d), range(1, len(d.get_shape())), keep_dims=True))
-    # d /= tf.sqrt(1e-6 + tf.reduce_sum(tf.pow(d, 2.0), range(1, len(d.get_shape())), keep_dims=True))
-
-    # Tensorflow v2
-    d /= (1e-12 + tf.reduce_max(tf.abs(d), range(1, len(d.get_shape())), keepdims=True))
-    d /= tf.sqrt(1e-6 + tf.reduce_sum(tf.pow(d, 2.0), range(1, len(d.get_shape())), keepdims=True))
+    d /= (1e-12 + tf.reduce_max(tf.abs(d), range(1, len(d.get_shape())), keep_dims=True))
+    d /= tf.sqrt(1e-6 + tf.reduce_sum(tf.pow(d, 2.0), range(1, len(d.get_shape())), keep_dims=True))
     return d
 
 
 def generate_virtual_adversarial_perturbation(x, logit, forward, is_training=True):
-    # d = tf.random_normal(shape=tf.shape(x))  # v1
-    d = tf.random.normal(shape=tf.shape(x))   # v2
+    d = tf.random_normal(shape=tf.shape(x))
 
     for _ in range(num_power_iterations):
         d = xi * get_normalized_vector(d)
         logit_p = logit
         logit_m = forward(x + d, is_training=is_training)
-        if len(logit_p) > 1:
-            dist = kl_divergence_with_logit(logit_p[0], logit_m[0])
-        else:
-            dist = kl_divergence_with_logit(logit_p, logit_m)
-
-        # grad = tf.gradients(dist, [d], aggregation_method=2)[0]   # v1
-        with tf.GradientTape() as tape:
-            grad = tape.gradient(dist, [d])[0]   # v2
-
+        dist = kl_divergence_with_logit(logit_p[0], logit_m[0])
+        grad = tf.gradients(dist, [d], aggregation_method=2)[0]
         d = tf.stop_gradient(grad)
 
     return epsilon * get_normalized_vector(d)
@@ -55,10 +43,7 @@ def virtual_adversarial_loss(x, logit, forward, is_training=True, name="vat_loss
     logit = tf.stop_gradient(logit)
     logit_p = logit
     logit_m = forward(x + r_vadv, is_training=is_training)
-    if len(logit_p) > 1:
-        loss = kl_divergence_with_logit(logit_p[0], logit_m[0])
-    else:
-        loss = kl_divergence_with_logit(logit_p, logit_m)
+    loss = kl_divergence_with_logit(logit_p[0], logit_m[0])
     return tf.identity(loss, name=name)
 
 

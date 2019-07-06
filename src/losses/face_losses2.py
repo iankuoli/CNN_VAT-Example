@@ -41,16 +41,13 @@ def arcface_loss(embedding, labels, out_num, m=0.5, s=64., w_init=None):
     cos_mt_temp = tf.where(cond, cos_mt, keep_val)
 
     mask = tf.one_hot(labels, depth=out_num, name='one_hot_mask')
-    # mask = tf.squeeze(mask, 1)
     inv_mask = tf.subtract(1., mask, name='inverse_mask')
 
     s_cos_t = tf.multiply(s, cos_t, name='scalar_cos_t')
 
     output = tf.add(tf.multiply(s_cos_t, inv_mask), tf.multiply(cos_mt_temp, mask), name='arcface_loss_output')
 
-    arcface_model = tf.keras.Model(inputs=embedding, outputs=output)
-
-    return arcface_model
+    return output
 
 
 def cosineface_losses(embedding, labels, out_num, m=0.4, s=30., w_init=None):
@@ -137,10 +134,9 @@ def focal_loss_with_softmax(labels, logits, gamma=2):
     gamma: hyper-parameter
     return L: mean loss
     """
-    y_pred = tf.nn.softmax(logits, dim=-1)
+    y_pred = tf.nn.softmax(logits, axis=-1)
     labels = tf.one_hot(labels, depth=y_pred.shape[1])
-    loss = -labels * ((1 - y_pred) ** gamma) * tf.log(y_pred)
-    loss = tf.reduce_sum(loss, axis=1)
-    loss = tf.reduce_mean(loss)
+    loss = -labels * ((1 - y_pred) ** gamma) * tf.math.log(y_pred)
+    loss = tf.reduce_mean(tf.reduce_sum(loss, axis=1))
 
     return loss
