@@ -1,16 +1,6 @@
 import tensorflow as tf
 
 
-# The norm length for (virtual) adversarial training
-epsilon = 8.
-
-# The number of power iterations
-num_power_iterations = 1
-
-# The small constant for finite difference
-xi = 1e-6
-
-
 def kl_divergence_with_logit(q_logit, p_logit):
     q = tf.nn.softmax(q_logit)
     qlogq = tf.reduce_mean(input_tensor=tf.reduce_sum(input_tensor=q * tf.nn.log_softmax(q_logit), axis=1))
@@ -24,7 +14,19 @@ def get_normalized_vector(d):
     return d
 
 
-def generate_virtual_adversarial_perturbation(x, logit, forward, is_training=True, forward_index=0):
+def generate_virtual_adversarial_perturbation(x, logit, forward, xi=1e-8, num_power_iterations=1,
+                                              epsilon=8., is_training=True, forward_index=0):
+    '''
+    :param x:
+    :param logit:
+    :param forward:
+    :param xi: the small constant for finite difference
+    :param num_power_iterations: the number of power iterations
+    :param epsilon: the norm length for (virtual) adversarial training
+    :param is_training:
+    :param forward_index:
+    :return:
+    '''
     d = tf.random.normal(shape=tf.shape(input=x))
 
     for _ in range(num_power_iterations):
@@ -43,8 +45,23 @@ def generate_virtual_adversarial_perturbation(x, logit, forward, is_training=Tru
     return epsilon * get_normalized_vector(d)
 
 
-def virtual_adversarial_loss(x, logit, forward, is_training=True, name="vat_loss", forward_index=0):
-    r_vadv = generate_virtual_adversarial_perturbation(x, logit, forward, is_training=is_training,
+def virtual_adversarial_loss(x, logit, forward, xi=1e-8, num_power_iterations=1, epsilon=8.,
+                             is_training=True, name="vat_loss", forward_index=0):
+    '''
+    :param x:
+    :param logit:
+    :param forward:
+    :param xi: the small constant for finite difference
+    :param num_power_iterations: the number of power iterations
+    :param epsilon: the norm length for (virtual) adversarial training
+    :param is_training:
+    :param name:
+    :param forward_index:
+    :return:
+    '''
+    r_vadv = generate_virtual_adversarial_perturbation(x, logit, forward, xi=xi, epsilon=epsilon,
+                                                       num_power_iterations=num_power_iterations,
+                                                       is_training=is_training,
                                                        forward_index=forward_index)
     logit = tf.stop_gradient(logit)
     logit_p = logit
@@ -56,7 +73,13 @@ def virtual_adversarial_loss(x, logit, forward, is_training=True, name="vat_loss
     return tf.identity(loss, name=name)
 
 
-def generate_adversarial_perturbation(x, loss):
+def generate_adversarial_perturbation(x, loss, epsilon=8.):
+    '''
+    :param x:
+    :param loss:
+    :param epsilon: the norm length for (virtual) adversarial training
+    :return:
+    '''
     grad = tf.gradients(ys=loss, xs=[x], aggregation_method=2)[0]
     grad = tf.stop_gradient(grad)
     return epsilon * get_normalized_vector(grad)

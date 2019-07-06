@@ -2,14 +2,14 @@ import tensorflow as tf
 import math
 
 
-def arcface_loss(embedding, labels, out_num, m=0.5, s=64., w_init=None):
+def arcface_loss(embedding, labels, out_num, weights, m=0.5, s=64):
     '''
     :param embedding: the input embedding vectors
     :param labels: the input labels, the shape should be e.g., (batch_size, 1)
     :param out_num: output class num
     :param m: the margin value, default is 0.5
     :param s: the scalar value, default is 64
-    :param w_init: the method for weight initialization
+    :param weights: embedding_weights for classification
     :return: the final calculated output, this output is send into the tf.nn.softmax directly
     '''
 
@@ -19,8 +19,8 @@ def arcface_loss(embedding, labels, out_num, m=0.5, s=64., w_init=None):
     threshold = math.cos(math.pi - m)
 
     # Normalization of inputs and weights
-    weights = tf.Variable(w_init(shape=(embedding.get_shape().as_list()[-1], out_num)), name='embedding_weights',
-                          dtype=tf.float32)
+    # weights = tf.Variable(w_init(shape=(embedding.get_shape().as_list()[-1], out_num)), name='embedding_weights',
+    #                       dtype=tf.float32)
     weights_unit = tf.nn.l2_normalize(weights, axis=0)
     embedding_unit = tf.nn.l2_normalize(embedding, axis=1)
 
@@ -127,7 +127,7 @@ def combine_loss_val(embedding, labels, out_num, margin_a, margin_m, margin_b, s
     return zy, loss, accuracy, accuracy_s, predict_cls_s
 
 
-def focal_loss_with_softmax(labels, logits, gamma=2):
+def focal_loss_with_softmax(labels, logits, gamma=2, epsilon=1e-12):
     """
     labels: shape([batch_size], type = int32)
     logits: shape([batch_size,num_classes], type = float32)
@@ -136,7 +136,7 @@ def focal_loss_with_softmax(labels, logits, gamma=2):
     """
     y_pred = tf.nn.softmax(logits, axis=-1)
     labels = tf.one_hot(labels, depth=y_pred.shape[1])
-    loss = -labels * ((1 - y_pred) ** gamma) * tf.math.log(y_pred)
+    loss = -labels * ((1 - y_pred) ** gamma) * tf.math.log(y_pred + epsilon)
     loss = tf.reduce_mean(tf.reduce_sum(loss, axis=1))
 
     return loss

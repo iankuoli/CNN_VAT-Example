@@ -1,5 +1,5 @@
 import tensorflow as tf
-from tensorflow.keras import Model, layers
+from tensorflow.keras import Model, layers, regularizers
 
 
 # Create TF Model.
@@ -10,12 +10,16 @@ class ConvNet(Model):
         super(ConvNet, self).__init__()
 
         # Convolution Layer with 32 filters and a kernel size of 5.
-        self.conv1 = layers.Conv2D(32, kernel_size=5, activation=tf.nn.relu)
+        self.conv1 = layers.Conv2D(32, kernel_size=5, activation=tf.nn.relu,
+                                   kernel_regularizer=regularizers.l2(0.01),
+                                   bias_regularizer=regularizers.l2(0.01))
         # Max Pooling (down-sampling) with kernel size of 2 and strides of 2.
         self.maxpool1 = layers.MaxPool2D(2, strides=2)
 
         # Convolution Layer with 64 filters and a kernel size of 3.
-        self.conv2 = layers.Conv2D(64, kernel_size=3, activation=tf.nn.relu)
+        self.conv2 = layers.Conv2D(64, kernel_size=3, activation=tf.nn.relu,
+                                   kernel_regularizer=regularizers.l2(0.01),
+                                   bias_regularizer=regularizers.l2(0.01))
         # Max Pooling (down-sampling) with kernel size of 2 and strides of 2.
         self.maxpool2 = layers.MaxPool2D(2, strides=2)
 
@@ -23,22 +27,20 @@ class ConvNet(Model):
         self.flatten = layers.Flatten()
 
         # Fully connected layer.
-        self.fc1 = layers.Dense(1024)
+        self.fc1 = layers.Dense(1024, kernel_regularizer=regularizers.l2(0.01),
+                                bias_regularizer=regularizers.l2(0.01))
         # Apply Dropout (if is_training is False, dropout is not applied).
         self.dropout1 = layers.Dropout(rate=0.5)
 
         # Fully connected layer.
-        self.fc2 = layers.Dense(32)
+        self.fc2 = layers.Dense(64, kernel_regularizer=regularizers.l2(0.01),
+                                bias_regularizer=regularizers.l2(0.01))
         # Apply Dropout (if is_training is False, dropout is not applied).
         self.dropout2 = layers.Dropout(rate=0.5)
 
-        self.cos_weight = tf.nn.l2_normalize(tf.Variable(tf.initializers.GlorotNormal()(shape=(32, num_classes)),
-                                                         name='embedding_weights', dtype=tf.float32),
-                                             axis=0)
-        self.cos_scale = s
-
         # Output layer, class prediction.
-        self.out = layers.Dense(num_classes)
+        self.out = layers.Dense(num_classes, use_bias=False,
+                                kernel_regularizer=regularizers.l2(0.01))
 
     # Set forward pass.
     def call(self, x, is_training=False):
@@ -54,14 +56,15 @@ class ConvNet(Model):
         x = self.fc2(x)
         embed = self.dropout2(x, training=is_training)
 
-        embed_unit = tf.nn.l2_normalize(embed, axis=1)
-        cos_t = tf.matmul(embed_unit, self.cos_weight, name='cos_t')
+        #embed_unit = tf.nn.l2_normalize(embed, axis=1)
+        #cos_t = tf.matmul(embed_unit, self.cos_weight, name='cos_t')
 
-        prediction = self.out(cos_t * self.cos_scale)
+        #out = self.out(cos_t * self.cos_scale)
+        out = self.out(embed)
 
         if not is_training:
             # tf cross entropy expect logits without softmax, so only
             # apply softmax when not training.
-            prediction = tf.nn.softmax(prediction)
+            out = tf.nn.softmax(out)
 
-        return embed, prediction
+        return embed, out

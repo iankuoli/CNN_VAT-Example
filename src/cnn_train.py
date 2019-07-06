@@ -48,7 +48,7 @@ def run_optimization(x, y, loss_type='cat', use_vat=False):
         # Compute inference loss.
         if loss_type == 'arcface':
             arcface_logits = arcface_loss(embedding=embeds, labels=y, out_num=num_classes,
-                                          w_init=tf.initializers.GlorotNormal())
+                                          weights=conv_net.out.weights[0])
             embeds_loss = tf.reduce_mean(focal_loss_with_softmax(logits=arcface_logits, labels=y))
             inference_loss = utils.cross_entropy_loss(preds, y)
             loss = embeds_loss + inference_loss
@@ -56,7 +56,7 @@ def run_optimization(x, y, loss_type='cat', use_vat=False):
             loss = utils.cross_entropy_loss(preds, y)
 
         if use_vat:
-            vat_loss = vat.virtual_adversarial_loss(x, embeds, conv_net, is_training=True)
+            vat_loss = vat.virtual_adversarial_loss(x, embeds, conv_net, xi=1e-4, is_training=True)
             loss += vat_loss
 
     # Variables to update, i.e. trainable variables.
@@ -75,24 +75,24 @@ for epoch in range(3):
 
     for step, (batch_x, batch_y) in enumerate(train_data):
         use_loss = 'arcface'
-        use_vat = False
+        use_vat = True
 
         run_optimization(batch_x, batch_y, loss_type=use_loss, use_vat=use_vat)
 
         if step % display_step == 0:
 
-            embed, pred = conv_net(batch_x)
+            embed, pred = conv_net(x_test)
 
-            acc = utils.accuracy(pred, batch_y)
+            acc = utils.accuracy(pred, y_test)
 
             if use_loss == 'arcface':
-                arcface_logit = arcface_loss(embedding=embed, labels=batch_y, out_num=num_classes,
-                                             w_init=tf.initializers.GlorotNormal())
-                embed_loss = tf.reduce_mean(focal_loss_with_softmax(logits=arcface_logit, labels=batch_y))
-                infer_loss = utils.cross_entropy_loss(pred, batch_y)
+                arcface_logit = arcface_loss(embedding=embed, labels=y_test, out_num=num_classes,
+                                             weights=conv_net.out.weights[0])
+                embed_loss = tf.reduce_mean(focal_loss_with_softmax(logits=arcface_logit, labels=y_test))
+                infer_loss = utils.cross_entropy_loss(pred, y_test)
                 print("step: %i, embed_loss: %f, infer_loss: %f, accuracy: %f" % (step, embed_loss, infer_loss, acc))
             else:
-                loss = utils.cross_entropy_loss(pred, batch_y)
+                loss = utils.cross_entropy_loss(pred, y_test)
                 print("step: %i, loss: %f, accuracy: %f" % (step, loss, acc))
 
 '''
