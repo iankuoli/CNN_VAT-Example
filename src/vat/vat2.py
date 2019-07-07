@@ -1,6 +1,11 @@
 import tensorflow as tf
 
 
+def vat_decay(iterator):
+    exponent = iterator / 100
+    return 1 / (10 ** exponent)
+
+
 def kl_divergence_with_logit(q_logit, p_logit):
     q = tf.nn.softmax(q_logit)
     qlogq = tf.reduce_mean(input_tensor=tf.reduce_sum(input_tensor=q * tf.nn.log_softmax(q_logit), axis=1))

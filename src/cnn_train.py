@@ -15,8 +15,14 @@ num_classes = 10
 # Training parameters.
 learning_rate = 0.001
 training_steps = 200
-batch_size = 128
+batch_size = 256
 display_step = 10
+
+# Hyper-parameter for loss
+use_loss = 'arcface'
+use_vat = True
+xi_vat = 1e-4
+m_arcface = 0.5
 
 # Prepare MNIST data.
 (x_train, y_train), (x_test, y_test) = mnist.load_data()
@@ -30,14 +36,14 @@ train_data = tf.data.Dataset.from_tensor_slices((x_train, y_train))
 train_data = train_data.repeat().shuffle(5000).batch(batch_size).prefetch(1)
 
 # Build neural network model.
-conv_net = cnn.ConvNet(num_classes)
+conv_net = cnn.ConvNet(num_classes, use_loss=use_loss)
 
 # Stochastic gradient descent optimizer.
 optimizer = tf.optimizers.Adam(learning_rate)
 
 
 # Optimization process.
-def run_optimization(x, y, loss_type='cat', use_vat=False):
+def run_optimization(x, y, step, loss_type='cat', use_vat=False):
 
     # Wrap computation inside a GradientTape for automatic differentiation.
     with tf.GradientTape() as g:
@@ -48,7 +54,7 @@ def run_optimization(x, y, loss_type='cat', use_vat=False):
         # Compute inference loss.
         if loss_type == 'arcface':
             arcface_logits = arcface_loss(embedding=embeds, labels=y, out_num=num_classes,
-                                          weights=conv_net.out.weights[0])
+                                          weights=conv_net.out.weights[0], m=m_arcface)
             embeds_loss = tf.reduce_mean(focal_loss_with_softmax(logits=arcface_logits, labels=y))
             inference_loss = utils.cross_entropy_loss(preds, y)
             loss = embeds_loss + inference_loss
@@ -56,7 +62,8 @@ def run_optimization(x, y, loss_type='cat', use_vat=False):
             loss = utils.cross_entropy_loss(preds, y)
 
         if use_vat:
-            vat_loss = vat.virtual_adversarial_loss(x, embeds, conv_net, xi=1e-4, is_training=True)
+            vat_loss = vat.virtual_adversarial_loss(x, embeds, conv_net,
+                                                    xi=xi_vat*vat.vat_decay(step), is_training=False)
             loss += vat_loss
 
     # Variables to update, i.e. trainable variables.
@@ -74,10 +81,8 @@ for epoch in range(3):
     print('Start of epoch %d' % (epoch,))
 
     for step, (batch_x, batch_y) in enumerate(train_data):
-        use_loss = 'arcface'
-        use_vat = True
 
-        run_optimization(batch_x, batch_y, loss_type=use_loss, use_vat=use_vat)
+        run_optimization(batch_x, batch_y, step, loss_type=use_loss, use_vat=use_vat)
 
         if step % display_step == 0:
 
@@ -87,7 +92,7 @@ for epoch in range(3):
 
             if use_loss == 'arcface':
                 arcface_logit = arcface_loss(embedding=embed, labels=y_test, out_num=num_classes,
-                                             weights=conv_net.out.weights[0])
+                                             weights=conv_net.out.weights[0], m=m_arcface)
                 embed_loss = tf.reduce_mean(focal_loss_with_softmax(logits=arcface_logit, labels=y_test))
                 infer_loss = utils.cross_entropy_loss(pred, y_test)
                 print("step: %i, embed_loss: %f, infer_loss: %f, accuracy: %f" % (step, embed_loss, infer_loss, acc))

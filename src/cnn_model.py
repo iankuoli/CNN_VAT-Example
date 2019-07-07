@@ -6,8 +6,11 @@ from tensorflow.keras import Model, layers, regularizers
 class ConvNet(Model):
 
     # Set layers.
-    def __init__(self, num_classes, s=64):
+    def __init__(self, num_classes, use_loss='cat', s=64):
         super(ConvNet, self).__init__()
+
+        self.use_loss = use_loss
+        self.cos_scale = s
 
         # Convolution Layer with 32 filters and a kernel size of 5.
         self.conv1 = layers.Conv2D(32, kernel_size=5, activation=tf.nn.relu,
@@ -55,12 +58,13 @@ class ConvNet(Model):
         x = self.dropout1(x, training=is_training)
         x = self.fc2(x)
         embed = self.dropout2(x, training=is_training)
-
-        #embed_unit = tf.nn.l2_normalize(embed, axis=1)
-        #cos_t = tf.matmul(embed_unit, self.cos_weight, name='cos_t')
-
-        #out = self.out(cos_t * self.cos_scale)
         out = self.out(embed)
+
+        if self.use_loss == 'arcface':
+            embed_unit = tf.nn.l2_normalize(embed, axis=1)
+            weights_unit = tf.nn.l2_normalize(self.out.weights[0], axis=1)
+            cos_t = tf.matmul(embed_unit, weights_unit, name='cos_t')
+            out = cos_t * self.cos_scale
 
         if not is_training:
             # tf cross entropy expect logits without softmax, so only
