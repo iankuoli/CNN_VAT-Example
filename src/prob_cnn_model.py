@@ -1,5 +1,6 @@
 import tensorflow as tf
 from tensorflow.keras import Model, layers, regularizers
+import tensorflow_probability as tfp
 
 
 # Create TF Model.
@@ -13,16 +14,12 @@ class ConvNet(Model):
         self.cos_scale = s
 
         # Convolution Layer with 32 filters and a kernel size of 5.
-        self.conv1 = layers.Conv2D(32, kernel_size=5, activation=tf.nn.relu,
-                                   kernel_regularizer=regularizers.l2(0.01),
-                                   bias_regularizer=regularizers.l2(0.01))
+        self.conv1 = tfp.layers.Convolution2DFlipout(32, kernel_size=5, activation=tf.nn.relu)
         # Max Pooling (down-sampling) with kernel size of 2 and strides of 2.
         self.maxpool1 = layers.MaxPool2D(2, strides=2)
 
         # Convolution Layer with 64 filters and a kernel size of 3.
-        self.conv2 = layers.Conv2D(64, kernel_size=3, activation=tf.nn.relu,
-                                   kernel_regularizer=regularizers.l2(0.01),
-                                   bias_regularizer=regularizers.l2(0.01))
+        self.conv2 = tfp.layers.Convolution2DFlipout(64, kernel_size=3, activation=tf.nn.relu)
         # Max Pooling (down-sampling) with kernel size of 2 and strides of 2.
         self.maxpool2 = layers.MaxPool2D(2, strides=2)
 
@@ -30,21 +27,17 @@ class ConvNet(Model):
         self.flatten = layers.Flatten()
 
         # Fully connected layer.
-        self.fc1 = layers.Dense(1024, kernel_regularizer=regularizers.l2(0.01),
-                                bias_regularizer=regularizers.l2(0.01))
+        self.fc1 = tfp.layers.DenseFlipout(1024)
         # Apply Dropout (if is_training is False, dropout is not applied).
         self.dropout1 = layers.Dropout(rate=0.5)
 
         # Fully connected layer.
-        self.fc2 = layers.Dense(64, activation=tf.nn.relu,
-                                kernel_regularizer=regularizers.l2(0.01),
-                                bias_regularizer=regularizers.l2(0.01))
+        self.fc2 = tfp.layers.DenseFlipout(64, activation=tf.nn.relu)
         # Apply Dropout (if is_training is False, dropout is not applied).
         self.dropout2 = layers.Dropout(rate=0.5)
 
         # Output layer, class prediction.
-        self.out = layers.Dense(num_classes, use_bias=False,
-                                kernel_regularizer=regularizers.l2(0.01))
+        self.out = tfp.layers.DenseFlipout(num_classes)
 
     # Set forward pass.
     def call(self, x, is_training=False):
