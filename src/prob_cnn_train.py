@@ -27,8 +27,10 @@ m_arcface = 0.5
 
 # Prepare MNIST data.
 (x_train, y_train), (x_test, y_test) = mnist.load_data()
-# Convert to float32.
+# Convert x to float32.
 x_train, x_test = np.array(x_train, np.float32), np.array(x_test, np.float32)
+# Convert y to int32.
+y_train, y_test = np.array(y_train, np.int32), np.array(y_test, np.int32)
 # Normalize images value from [0, 255] to [0, 1].
 x_train, x_test = x_train / 255., x_test / 255.
 
@@ -51,7 +53,6 @@ def run_optimization(x, y, step, loss_type='cat', use_vat=False):
 
         # Forward pass.
         embeds, preds = conv_net(x, is_training=True)
-        preds = tfp.distributions.Categorical(logits=preds)
 
         # Compute inference loss.
         if loss_type == 'arcface':
@@ -62,7 +63,7 @@ def run_optimization(x, y, step, loss_type='cat', use_vat=False):
             loss = embeds_loss + inference_loss
         else:
             # Compute the -ELBO as the loss, averaged over the batch size.
-            # tmp = tf.expand_dims(tf.one_hot(y, num_classes), axis=-1)
+            tmp = tf.one_hot(y, num_classes)
             tmp2 = preds.log_prob(y)
             neg_log_likelihood = -tf.reduce_mean(input_tensor=tmp2)
             kl = sum(conv_net.losses) / batch_size

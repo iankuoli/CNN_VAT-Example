@@ -64,5 +64,7 @@ class ConvNet(Model):
             # tf cross entropy expect logits without softmax, so only
             # apply softmax when not training.
             out = tf.nn.softmax(out)
+        else:
+            out = tfp.distributions.Categorical(logits=out)
 
         return embed, out
